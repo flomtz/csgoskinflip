@@ -7,6 +7,7 @@ import (
 	"csgoskinflip/server/api/utils/log"
 	"csgoskinflip/server/config"
 	"csgoskinflip/server/utils/mongo"
+	"csgoskinflip/server/utils/request"
 )
 
 func main() {
@@ -15,5 +16,6 @@ func main() {
 	fmt.Println("Bind Address:", config.Config.BindAddress)
 	mongo.InitMongoClient(config.Config.MongoConnectionString)
 	fmt.Println("Mongo Address:", config.Config.MongoConnectionString)
+	request.InitClient()
 	api.SetupRoutes()
 }
