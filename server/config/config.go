@@ -10,7 +10,8 @@ import (
 var Config AppConfig
 
 type AppConfig struct {
-	BindAddress string `json:"bind_address"`
+	BindAddress           string `json:"bind_address"`
+	MongoConnectionString string `json:"mongo_connection_string"`
 }
 
 func loadConfig() error {
@@ -31,6 +32,6 @@ func init() { // init is a special function that is automatically called
 	err := loadConfig()
 	if err != nil {
 		fmt.Println("Error: Could not load config, using defaults to not break functionality! This is critical!", err)
-		Config = AppConfig{BindAddress: ":8080"}
+		Config = AppConfig{BindAddress: ":8080", MongoConnectionString: "mongodb://localhost:27017"}
 	}
 }
