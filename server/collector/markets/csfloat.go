@@ -72,7 +72,7 @@ func CSFloat(usdExchange float64) (*CSFloatOutput, error) {
 		})
 	}
 
-	err = saveToMongo(result)
+	err = saveCSFloatToMongo(result)
 	if err != nil {
 		return nil, fmt.Errorf("failed to save csfloat data to mongodb: %w", err)
 	}
@@ -110,7 +110,7 @@ func fetchDopplerPriceList() ([]DopplerPriceItem, error) {
 	return response.Data, nil
 }
 
-func saveToMongo(data *CSFloatOutput) error {
+func saveCSFloatToMongo(data *CSFloatOutput) error {
 	database := "csgoskinflip"
 	collection := "csfloat"
 
