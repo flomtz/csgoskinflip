@@ -19,7 +19,12 @@ func Run() {
 		fmt.Println(err)
 	}
 
-	_ = createSkinlist(csfloatData)
+	skinList := createSkinlist(csfloatData)
+
+	err = markets.Skinport(skinList)
+	if err != nil {
+		fmt.Println(err)
+	}
 
 }
 
@@ -61,17 +66,12 @@ func getExchangePrices() (usd float64, rmb float64, err error) {
 	return usdExchange, rmbExchange, nil
 }
 
-type SkinListItem struct {
-	Name  string `json:"name"`
-	Style string `json:"style"`
-}
-
-func createSkinlist(csfloatData *markets.CSFloatOutput) []SkinListItem {
-	skinlist := []SkinListItem{}
+func createSkinlist(csfloatData *markets.CSFloatOutput) []markets.SkinListItem {
+	skinlist := []markets.SkinListItem{}
 	csfloatItems := csfloatData.CSFloat
 
 	for _, item := range csfloatItems {
-		skinlist = append(skinlist, SkinListItem{
+		skinlist = append(skinlist, markets.SkinListItem{
 			Name:  item.Name,
 			Style: item.Style,
 		})

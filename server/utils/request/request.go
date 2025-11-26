@@ -2,13 +2,17 @@ package request
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
+
+	"github.com/andybalholm/brotli"
 )
 
 type RequestOptions struct {
@@ -49,11 +53,13 @@ func makeRequest(method, requestURL string, body interface{}, options *RequestOp
 
 	var requestBody io.Reader
 
-	jsonBody, err := json.Marshal(body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request body: %w", err)
+	if body != nil {
+		jsonBody, err := json.Marshal(body)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal request body: %w", err)
+		}
+		requestBody = bytes.NewReader(jsonBody)
 	}
-	requestBody = bytes.NewReader(jsonBody)
 
 	finalURL, err := addQueryParams(requestURL, options.QueryParams)
 	if err != nil {
@@ -63,6 +69,10 @@ func makeRequest(method, requestURL string, body interface{}, options *RequestOp
 	req, err := http.NewRequestWithContext(options.Context, method, finalURL, requestBody)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	if req.Header.Get("User-Agent") == "" {
+		req.Header.Set("User-Agent", "Go-http-client/2.0")
 	}
 
 	for key, value := range options.Headers {
@@ -83,7 +93,22 @@ func makeRequest(method, requestURL string, body interface{}, options *RequestOp
 	}
 	defer resp.Body.Close()
 
-	responseBody, err := io.ReadAll(resp.Body)
+	var reader io.Reader = resp.Body
+	encoding := resp.Header.Get("Content-Encoding")
+
+	switch strings.ToLower(encoding) {
+	case "br":
+		reader = brotli.NewReader(resp.Body)
+	case "gzip":
+		gzipReader, err := gzip.NewReader(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create gzip reader: %w", err)
+		}
+		defer gzipReader.Close()
+		reader = gzipReader
+	}
+
+	responseBody, err := io.ReadAll(reader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
