@@ -1,3 +1,4 @@
  {
-    "bind_address": "xxxx"
+    "bind_address": ":xxx",
+    "mongo_connection_string": "mongodb://localhost:27017"
  }
