@@ -12,6 +12,7 @@ var Config AppConfig
 type AppConfig struct {
 	BindAddress           string `json:"bind_address"`
 	MongoConnectionString string `json:"mongo_connection_string"`
+	CSFloatAPIKey         string `json:"csfloat_api_key"`
 }
 
 func loadConfig() error {
