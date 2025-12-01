@@ -72,7 +72,7 @@ func Skinport(skinList []SkinListItem) error {
 
 	err = saveSkinportToMongo(result)
 	if err != nil {
-		return fmt.Errorf("failed to save csfloat data to mongodb: %w", err)
+		return fmt.Errorf("failed to save skinport data to mongodb: %w", err)
 	}
 
 	return nil

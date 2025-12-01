@@ -9,7 +9,7 @@ import (
 
 func Run() {
 
-	usdExchange, _, err := getExchangePrices()
+	usdExchange, rmbExchange, err := getExchangePrices()
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -22,6 +22,11 @@ func Run() {
 	skinList := createSkinlist(csfloatData)
 
 	err = markets.Skinport(skinList)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	err = markets.C5Game(skinList, rmbExchange)
 	if err != nil {
 		fmt.Println(err)
 	}

@@ -12,7 +12,7 @@ var Config AppConfig
 type AppConfig struct {
 	BindAddress           string `json:"bind_address"`
 	MongoConnectionString string `json:"mongo_connection_string"`
-	CSFloatAPIKey         string `json:"csfloat_api_key"`
+	C5GameAPIKey          string `json:"c5game_api_key"`
 }
 
 func loadConfig() error {
@@ -33,6 +33,6 @@ func init() { // init is a special function that is automatically called
 	err := loadConfig()
 	if err != nil {
 		fmt.Println("Error: Could not load config, using defaults to not break functionality! This is critical!", err)
-		Config = AppConfig{BindAddress: ":8080", MongoConnectionString: "mongodb://localhost:27017"}
+		Config = AppConfig{BindAddress: ":8080", MongoConnectionString: "mongodb://localhost:27017", C5GameAPIKey: "xxx"}
 	}
 }
