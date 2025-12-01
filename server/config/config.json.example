@@ -1,0 +1,5 @@
+ {
+    "bind_address": ":xxx",
+    "mongo_connection_string": "mongodb://localhost:27017",
+    "c5game_api_key": "xxx"
+ }
