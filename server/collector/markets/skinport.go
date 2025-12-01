@@ -44,30 +44,11 @@ func Skinport(skinList []SkinListItem) error {
 		return fmt.Errorf("failed to fetch price list: %w", err)
 	}
 
-	skinMap := make(map[string]string)
+	apiMap := buildAPIMap(apiData)
+
 	for _, skin := range skinList {
-		skinMap[skin.Name] = skin.Style
-	}
-
-	for _, apiItem := range apiData {
-		version := ""
-		if apiItem.Version != nil {
-			version = *apiItem.Version
-		}
-
-		name := apiItem.MarketHashName
-		style := version
-
-		if expectedStyle, exists := skinMap[name]; exists {
-			if expectedStyle == "" || expectedStyle == style {
-				result.Skinport = append(result.Skinport, SkinportItem{
-					Name:  name,
-					Style: style,
-					Link:  apiItem.ItemPage,
-					Price: apiItem.MinPrice,
-				})
-			}
-		}
+		item := findItemInAPI(skin, apiMap)
+		result.Skinport = append(result.Skinport, item)
 	}
 
 	err = saveSkinportToMongo(result)
@@ -76,6 +57,47 @@ func Skinport(skinList []SkinListItem) error {
 	}
 
 	return nil
+}
+
+func buildAPIMap(apiData []SkinportAPIResponse) map[string]SkinportAPIResponse {
+	apiMap := make(map[string]SkinportAPIResponse)
+
+	for _, apiItem := range apiData {
+		version := ""
+		if apiItem.Version != nil {
+			version = *apiItem.Version
+		}
+
+		key := fmt.Sprintf("%s|%s", apiItem.MarketHashName, version)
+		apiMap[key] = apiItem
+	}
+
+	return apiMap
+}
+
+func findItemInAPI(skin SkinListItem, apiMap map[string]SkinportAPIResponse) SkinportItem {
+	key := fmt.Sprintf("%s|%s", skin.Name, skin.Style)
+
+	if apiItem, exists := apiMap[key]; exists {
+		version := ""
+		if apiItem.Version != nil {
+			version = *apiItem.Version
+		}
+
+		return SkinportItem{
+			Name:  apiItem.MarketHashName,
+			Style: version,
+			Link:  apiItem.ItemPage,
+			Price: apiItem.MinPrice,
+		}
+	}
+
+	return SkinportItem{
+		Name:  skin.Name,
+		Style: skin.Style,
+		Link:  "",
+		Price: 0,
+	}
 }
 
 func fetchPriceList() ([]SkinportAPIResponse, error) {
