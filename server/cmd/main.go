@@ -32,15 +32,15 @@ func main() {
 }
 
 func analyzeMarket() {
-	collector.Run()
-	calculator.Run()
+	csfloatDataList, skinportDataList, c5gameDataList := collector.Run()
+	calculator.Run(csfloatDataList, skinportDataList, c5gameDataList)
 
 	ticker := time.NewTicker(15 * time.Minute)
 	defer ticker.Stop()
 
 	for range ticker.C {
-		collector.Run()
-		calculator.Run()
+		csfloatDataList, skinportDataList, c5gameDataList := collector.Run()
+		calculator.Run(csfloatDataList, skinportDataList, c5gameDataList)
 	}
 }
 

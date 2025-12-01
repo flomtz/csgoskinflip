@@ -7,7 +7,7 @@ import (
 	"fmt"
 )
 
-func Run() {
+func Run() ([]markets.SkinItem, []markets.SkinItem, []markets.SkinItem) {
 
 	usdExchange, rmbExchange, err := getExchangePrices()
 	if err != nil {
@@ -18,19 +18,22 @@ func Run() {
 	if err != nil {
 		fmt.Println(err)
 	}
-
+	csfloatDataList := csfloatData.CSFloat
 	skinList := createSkinlist(csfloatData)
 
-	err = markets.Skinport(skinList)
+	skinportData, err := markets.Skinport(skinList)
 	if err != nil {
 		fmt.Println(err)
 	}
+	skinportDataList := skinportData.Skinport
 
-	err = markets.C5Game(skinList, rmbExchange)
+	c5gameData, err := markets.C5Game(skinList, rmbExchange)
 	if err != nil {
 		fmt.Println(err)
 	}
+	c5gameDataList := c5gameData.C5Game
 
+	return csfloatDataList, skinportDataList, c5gameDataList
 }
 
 type RateItem struct {

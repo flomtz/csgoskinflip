@@ -11,15 +11,8 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 )
 
-type SkinportItem struct {
-	Name  string  `json:"name"`
-	Style string  `json:"style"`
-	Link  string  `json:"link"`
-	Price float64 `json:"price"`
-}
-
 type SkinportOutput struct {
-	Skinport []SkinportItem `json:"skinport"`
+	Skinport []SkinItem `json:"skinport"`
 }
 
 type SkinportAPIResponse struct {
@@ -34,14 +27,14 @@ type SkinListItem struct {
 	Style string
 }
 
-func Skinport(skinList []SkinListItem) error {
+func Skinport(skinList []SkinListItem) (*SkinportOutput, error) {
 	result := &SkinportOutput{
-		Skinport: []SkinportItem{},
+		Skinport: []SkinItem{},
 	}
 
 	apiData, err := fetchPriceList()
 	if err != nil {
-		return fmt.Errorf("failed to fetch price list: %w", err)
+		return nil, fmt.Errorf("failed to fetch price list: %w", err)
 	}
 
 	apiMap := buildAPIMap(apiData)
@@ -53,10 +46,10 @@ func Skinport(skinList []SkinListItem) error {
 
 	err = saveSkinportToMongo(result)
 	if err != nil {
-		return fmt.Errorf("failed to save skinport data to mongodb: %w", err)
+		return nil, fmt.Errorf("failed to save skinport data to mongodb: %w", err)
 	}
 
-	return nil
+	return result, nil
 }
 
 func buildAPIMap(apiData []SkinportAPIResponse) map[string]SkinportAPIResponse {
@@ -75,7 +68,7 @@ func buildAPIMap(apiData []SkinportAPIResponse) map[string]SkinportAPIResponse {
 	return apiMap
 }
 
-func findItemInAPI(skin SkinListItem, apiMap map[string]SkinportAPIResponse) SkinportItem {
+func findItemInAPI(skin SkinListItem, apiMap map[string]SkinportAPIResponse) SkinItem {
 	key := fmt.Sprintf("%s|%s", skin.Name, skin.Style)
 
 	if apiItem, exists := apiMap[key]; exists {
@@ -84,7 +77,7 @@ func findItemInAPI(skin SkinListItem, apiMap map[string]SkinportAPIResponse) Ski
 			version = *apiItem.Version
 		}
 
-		return SkinportItem{
+		return SkinItem{
 			Name:  apiItem.MarketHashName,
 			Style: version,
 			Link:  apiItem.ItemPage,
@@ -92,7 +85,7 @@ func findItemInAPI(skin SkinListItem, apiMap map[string]SkinportAPIResponse) Ski
 		}
 	}
 
-	return SkinportItem{
+	return SkinItem{
 		Name:  skin.Name,
 		Style: skin.Style,
 		Link:  "",
