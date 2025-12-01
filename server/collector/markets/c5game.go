@@ -27,11 +27,10 @@ type C5GameOutout struct {
 }
 
 func C5Game(skinlist []SkinListItem, rmbExchange float64) error {
-	_ = &C5GameOutout{
+	result := &C5GameOutout{
 		C5Game: []C5GameItem{},
 	}
 
-	start := time.Now()
 	var normalSkins []SkinListItem
 	var dopplerSkins []SkinListItem
 
@@ -49,18 +48,27 @@ func C5Game(skinlist []SkinListItem, rmbExchange float64) error {
 		}
 	}
 
-	_, err := fetchDopplerSkins(dopplerSkins, rmbExchange)
+	normalSkinsList, err := fetchNormalSkins(normalSkins, rmbExchange)
+	if err != nil {
+		return fmt.Errorf("failed to get normal skins prices: %v", err)
+	}
+
+	dopplerSkinsList, err := fetchDopplerSkins(dopplerSkins, rmbExchange)
 	if err != nil {
 		return fmt.Errorf("failed to get doppler skins prices: %v", err)
 	}
 
-	fmt.Println("Total time", time.Since(start))
+	result.C5Game = append(normalSkinsList, dopplerSkinsList...)
+
+	err = saveC5GameToMongo(result)
+	if err != nil {
+		return fmt.Errorf("failed to save c5game data: %v", err)
+	}
 
 	return nil
 }
 
 func fetchNormalSkins(skinlist []SkinListItem, rmbExchange float64) ([]C5GameItem, error) {
-	start := time.Now()
 	var result []C5GameItem
 	apiBulkUrl := fmt.Sprintf("https://openapi.c5game.com/merchant/product/price/batch?app-key=%s", config.Config.C5GameAPIKey)
 
@@ -128,12 +136,22 @@ func fetchNormalSkins(skinlist []SkinListItem, rmbExchange float64) ([]C5GameIte
 			}
 
 			mu.Lock()
-			for _, item := range apiResp.Data {
-				result = append(result, C5GameItem{
-					Name:  item.MarketHashName,
-					Link:  item.Website,
-					Price: math.Round((item.Price*rmbExchange)*100) / 100,
-				})
+			for _, requestedName := range job.items {
+				if item, exists := apiResp.Data[requestedName]; exists {
+					result = append(result, C5GameItem{
+						Name:  item.MarketHashName,
+						Style: "",
+						Link:  item.Website,
+						Price: math.Round((item.Price*rmbExchange)*100) / 100,
+					})
+				} else {
+					result = append(result, C5GameItem{
+						Name:  requestedName,
+						Style: "",
+						Link:  "",
+						Price: 0,
+					})
+				}
 			}
 			mu.Unlock()
 		}
@@ -161,41 +179,29 @@ func fetchNormalSkins(skinlist []SkinListItem, rmbExchange float64) ([]C5GameIte
 	wg.Wait()
 	close(errors)
 
-	errorCount := 0
 	for err := range errors {
 		fmt.Println("Error:", err)
-		errorCount++
 	}
-
-	fmt.Println("Errors:", errorCount)
-	fmt.Println("Normalskins completed in:", time.Since(start))
 
 	return result, nil
 }
 
 var styleMap = map[string]int{
-	"":           0,
-	"Phase 1":    11,
-	"Phase 2":    12,
-	"Phase 3":    13,
-	"Phase 4":    14,
-	"Ruby":       31,
-	"Sapphire":   33,
-	"Blackpearl": 34,
-	"Emerald":    32,
-	"Singleblue": 35,
+	"":            0,
+	"Phase 1":     11,
+	"Phase 2":     12,
+	"Phase 3":     13,
+	"Phase 4":     14,
+	"Ruby":        31,
+	"Sapphire":    33,
+	"Black Pearl": 34,
+	"Emerald":     32,
+	"Singleblue":  35,
 }
 
 func fetchDopplerSkins(skinlist []SkinListItem, rmbExchange float64) ([]C5GameItem, error) {
-	start := time.Now()
 	var result []C5GameItem
 	apiUrl := fmt.Sprintf("https://openapi.c5game.com/merchant/market/v2/products/condition/hash/name?app-key=%s", config.Config.C5GameAPIKey)
-
-	const workers = 5
-
-	errors := make(chan error, len(skinlist))
-	var wg sync.WaitGroup
-	var mu sync.Mutex
 
 	type apiResponse struct {
 		Success bool `json:"success"`
@@ -203,94 +209,76 @@ func fetchDopplerSkins(skinlist []SkinListItem, rmbExchange float64) ([]C5GameIt
 			List []struct {
 				Price          float64 `json:"price"`
 				MarketHashName string  `json:"marketHashName"`
-				ItemID         int     `json:"itemId"`
+				ItemID         string  `json:"itemId"`
 			} `json:"list"`
 		} `json:"data"`
 	}
 
-	fmt.Println("Skinlist length:", len(skinlist))
-
-	worker := func(skins <-chan SkinListItem) {
-		defer wg.Done()
-
-		for skin := range skins {
-			styleId := styleMap[skin.Style]
-			payload := map[string]interface{}{
-				"appId":           730,
-				"marketHashNames": skin.Name,
-				"styleId":         styleId,
-			}
-
-			resp, err := request.Post(apiUrl, payload, &request.RequestOptions{
-				Context: context.Background(),
-				Timeout: 15 * time.Second,
-				Headers: map[string]string{
-					"Content-Type": "application/json",
-				},
-			})
-			if err != nil {
-				errors <- fmt.Errorf("%s %s failed: %w", skin.Name, skin.Style, err)
-				continue
-			}
-
-			var apiResp apiResponse
-			err = json.Unmarshal(resp.Body, &apiResp)
-			if err != nil {
-				errors <- fmt.Errorf("invalid JSON in %s %s: %w", skin.Name, skin.Style, err)
-				continue
-			}
-
-			if !apiResp.Success {
-				errors <- fmt.Errorf("api error in %s %s", skin.Name, skin.Style)
-				continue
-			}
-
-			if len(apiResp.Data.List) == 0 {
-				errors <- fmt.Errorf("no listings for %s %s", skin.Name, skin.Style)
-				continue
-			}
-
-			bestListing := apiResp.Data.List[0]
-
-			link := fmt.Sprintf(
-				"https://www.c5game.com/en/csgo/%d/%s/sell?levelIds=%d",
-				bestListing.ItemID,
-				url.QueryEscape(bestListing.MarketHashName),
-				styleId,
-			)
-
-			mu.Lock()
-			result = append(result, C5GameItem{
-				Name:  bestListing.MarketHashName,
-				Link:  link,
-				Price: math.Round((bestListing.Price*rmbExchange)*100) / 100,
-			})
-			mu.Unlock()
-		}
-	}
-
-	skinChan := make(chan SkinListItem, len(skinlist))
-	wg.Add(workers)
-	for i := 0; i < workers; i++ {
-		go worker(skinChan)
-	}
-
 	for _, skin := range skinlist {
-		skinChan <- skin
+		styleId, exists := styleMap[skin.Style]
+		if !exists {
+			fmt.Printf("\nUnbekannter Style: %s für %s", skin.Style, skin.Name)
+			continue
+		}
+
+		payload := map[string]interface{}{
+			"appId":          730,
+			"marketHashName": skin.Name,
+			"styleId":        styleId,
+		}
+
+		resp, err := request.Post(apiUrl, payload, &request.RequestOptions{
+			Context: context.Background(),
+			Timeout: 15 * time.Second,
+			Headers: map[string]string{
+				"Content-Type": "application/json",
+			},
+		})
+		if err != nil {
+			fmt.Printf("\n%s %s failed: %s", skin.Name, skin.Style, err)
+		}
+
+		var apiResp apiResponse
+		err = json.Unmarshal(resp.Body, &apiResp)
+		if err != nil {
+			fmt.Printf("\ninvalid JSON in %s %s: %s", skin.Name, skin.Style, err)
+			continue
+		}
+
+		if !apiResp.Success {
+			fmt.Printf("\napi error in %s %s", skin.Name, skin.Style)
+			continue
+		}
+
+		if len(apiResp.Data.List) == 0 {
+			entry := C5GameItem{
+				Name:  skin.Name,
+				Style: skin.Style,
+				Link:  "",
+				Price: 0,
+			}
+			result = append(result, entry)
+			continue
+		}
+
+		bestListing := apiResp.Data.List[0]
+
+		link := fmt.Sprintf(
+			"https://www.c5game.com/en/csgo/%s/%s/sell?levelIds=%d",
+			bestListing.ItemID,
+			url.QueryEscape(bestListing.MarketHashName),
+			styleId,
+		)
+
+		entry := C5GameItem{
+			Name:  bestListing.MarketHashName,
+			Style: skin.Style,
+			Link:  link,
+			Price: math.Round((bestListing.Price*rmbExchange)*100) / 100,
+		}
+
+		result = append(result, entry)
 	}
-	close(skinChan)
-
-	wg.Wait()
-	close(errors)
-
-	errorCount := 0
-	for err := range errors {
-		fmt.Println("Error:", err)
-		errorCount++
-	}
-
-	fmt.Println("Errors:", errorCount)
-	fmt.Println("Dopplerskins completed in:", time.Since(start))
 
 	return result, nil
 }
