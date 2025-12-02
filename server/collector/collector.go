@@ -37,39 +37,28 @@ func Run() ([]markets.SkinItem, []markets.SkinItem, []markets.SkinItem) {
 }
 
 type RateItem struct {
-	EUR float64 `json:"EUR"`
+	EUR float64 `json:"eur"`
+	CNY float64 `json:"cny"`
 }
 
 type ExchangePrice struct {
-	Rates RateItem `json:"rates"`
+	Data RateItem `json:"data"`
 }
 
 func getExchangePrices() (usd float64, rmb float64, err error) {
-	respUSD, err := request.Get("https://api.frankfurter.dev/v1/latest?base=USD", nil)
+	respUSD, err := request.Get("https://csfloat.com/api/v1/meta/exchange-rates", nil)
 	if err != nil {
 		return 0, 0, err
 	}
 
-	var USDData ExchangePrice
-	err = json.Unmarshal(respUSD.Body, &USDData)
+	var ExchangeData ExchangePrice
+	err = json.Unmarshal(respUSD.Body, &ExchangeData)
 	if err != nil {
 		return 0, 0, err
 	}
 
-	usdExchange := USDData.Rates.EUR
-
-	respRMB, err := request.Get("https://api.frankfurter.dev/v1/latest?base=CNY", nil)
-	if err != nil {
-		return 0, 0, err
-	}
-
-	var RMBData ExchangePrice
-	err = json.Unmarshal(respRMB.Body, &RMBData)
-	if err != nil {
-		return 0, 0, err
-	}
-
-	rmbExchange := RMBData.Rates.EUR
+	usdExchange := ExchangeData.Data.EUR
+	rmbExchange := usdExchange / ExchangeData.Data.CNY
 
 	return usdExchange, rmbExchange, nil
 }
