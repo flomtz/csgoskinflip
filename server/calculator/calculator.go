@@ -4,6 +4,7 @@ import (
 	"csgoskinflip/server/collector/markets"
 	"csgoskinflip/server/utils/mongo"
 	"fmt"
+	"math"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -13,9 +14,11 @@ type TradeItem struct {
 	Name  string `bson:"name"`
 	Style string `bson:"style"`
 
-	BuyLink  string `bson:"buy_link"`
-	SellLink string `bson:"sell_link"`
-	Image    string `bson:"image_link"`
+	BuyPlattform  string `bson:"buy_plattform"`
+	BuyLink       string `bson:"buy_link"`
+	SellPlattform string `bson:"sell_plattform"`
+	SellLink      string `bson:"sell_link"`
+	Image         string `bson:"image_link"`
 
 	BuyPrice          float64 `bson:"buy_price"`
 	BuyPriceWithFees  float64 `bson:"buy_price_with_fees"`
@@ -25,6 +28,8 @@ type TradeItem struct {
 	Profit                  float64 `bson:"profit"`
 	ProfitAfterWithdrawFrom float64 `bson:"profit_after_withdraw_from"`
 	ProfitAfterWithdrawTo   float64 `bson:"profit_after_withdraw_to"`
+
+	ROI float64 `bson:"roi_percent"`
 }
 
 type CalculatorOutput struct {
@@ -50,26 +55,41 @@ func Run(csfloatDataList []markets.SkinItem, skinportDataList []markets.SkinItem
 		}
 
 		var skinportPrice, skinportProfit float64
-		if skinportSkin.Price > 0 {
+		if skinportSkin.Price > 1 {
 			skinportPrice = skinportSkin.Price
-			skinportProfit = csfloatPrice - skinportPrice
+			skinportProfit = math.Round((csfloatPrice-skinportPrice)*100) / 100
 		} else {
 			skinportProfit = -999999999999
 		}
 
 		var c5gamePrice, c5gameProfit float64
-		if c5gameSkin.Price > 0 {
+		if c5gameSkin.Price > 1 {
 			c5gamePrice = c5gameSkin.Price * 1.01
-			c5gameProfit = csfloatPrice - c5gamePrice
+			c5gameProfit = math.Round((csfloatPrice-c5gamePrice)*100) / 100
 		} else {
 			c5gameProfit = -999999999999
 		}
 
 		if skinportProfit > 0 && skinportProfit >= c5gameProfit {
+			ProfitAfterWithdrawFrom := math.Round(((csfloatSkin.Price*0.955)-skinportPrice)*100) / 100
+			ProfitAfterWithdrawTo := math.Round(((csfloatSkin.Price*0.975)-skinportPrice)*100) / 100
+
+			if (ProfitAfterWithdrawFrom <= 0 || ProfitAfterWithdrawTo <= 0) || (csfloatPrice/skinportPrice) > 15 {
+				continue
+			}
+
+			ROI := math.Round(((csfloatPrice/skinportPrice)*100)*100) / 100
+
+			if ROI < 110 {
+				continue
+			}
+
 			result.Trades = append(result.Trades, TradeItem{
 				Name:                    csfloatSkin.Name,
 				Style:                   csfloatSkin.Style,
+				BuyPlattform:            "skinport",
 				BuyLink:                 skinportSkin.Link,
+				SellPlattform:           "csfloat",
 				SellLink:                "",
 				Image:                   "",
 				BuyPrice:                skinportSkin.Price,
@@ -77,14 +97,30 @@ func Run(csfloatDataList []markets.SkinItem, skinportDataList []markets.SkinItem
 				SellPrice:               csfloatSkin.Price,
 				SellPriceWithFees:       csfloatPrice,
 				Profit:                  skinportProfit,
-				ProfitAfterWithdrawFrom: (csfloatSkin.Price * 0.955) - skinportPrice,
-				ProfitAfterWithdrawTo:   (csfloatSkin.Price * 0.975) - skinportPrice,
+				ProfitAfterWithdrawFrom: ProfitAfterWithdrawFrom,
+				ProfitAfterWithdrawTo:   ProfitAfterWithdrawTo,
+				ROI:                     ROI,
 			})
 		} else if c5gameProfit > 0 {
+			ProfitAfterWithdrawFrom := math.Round(((csfloatSkin.Price*0.955)-c5gamePrice)*100) / 100
+			ProfitAfterWithdrawTo := math.Round(((csfloatSkin.Price*0.975)-c5gamePrice)*100) / 100
+
+			if (ProfitAfterWithdrawFrom <= 0 || ProfitAfterWithdrawTo <= 0) || (csfloatPrice/c5gamePrice) > 15 {
+				continue
+			}
+
+			ROI := math.Round(((csfloatPrice/c5gamePrice)*100)*100) / 100
+
+			if ROI < 110 {
+				continue
+			}
+
 			result.Trades = append(result.Trades, TradeItem{
 				Name:                    csfloatSkin.Name,
 				Style:                   csfloatSkin.Style,
+				BuyPlattform:            "c5game",
 				BuyLink:                 c5gameSkin.Link,
+				SellPlattform:           "csfloat",
 				SellLink:                "",
 				Image:                   "",
 				BuyPrice:                c5gameSkin.Price,
@@ -92,8 +128,9 @@ func Run(csfloatDataList []markets.SkinItem, skinportDataList []markets.SkinItem
 				SellPrice:               csfloatSkin.Price,
 				SellPriceWithFees:       csfloatPrice,
 				Profit:                  c5gameProfit,
-				ProfitAfterWithdrawFrom: (csfloatSkin.Price * 0.955) - c5gamePrice,
-				ProfitAfterWithdrawTo:   (csfloatSkin.Price * 0.975) - c5gamePrice,
+				ProfitAfterWithdrawFrom: ProfitAfterWithdrawFrom,
+				ProfitAfterWithdrawTo:   ProfitAfterWithdrawTo,
+				ROI:                     ROI,
 			})
 		}
 	}
