@@ -6,6 +6,7 @@ import (
 	"csgoskinflip/server/utils/mongo"
 	"fmt"
 	"math"
+	"strings"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -49,7 +50,13 @@ func Run(csfloatDataList []markets.SkinItem, skinportDataList []markets.SkinItem
 	c5gameMap := buildSkinMap(c5gameDataList)
 
 	for _, csfloatSkin := range csfloatDataList {
-		csfloatPrice := csfloatSkin.Price * 0.98
+
+		out := filterOutBullshit(csfloatSkin.Name)
+		if out {
+			continue
+		}
+
+		csfloatPrice := math.Round((csfloatSkin.Price*0.98)*100) / 100
 
 		skinportSkin := skinportMap[csfloatSkin.Name]
 		c5gameSkin := c5gameMap[csfloatSkin.Name]
@@ -78,7 +85,7 @@ func Run(csfloatDataList []markets.SkinItem, skinportDataList []markets.SkinItem
 			ProfitAfterWithdrawFrom := math.Round(((csfloatSkin.Price*0.955)-skinportPrice)*100) / 100
 			ProfitAfterWithdrawTo := math.Round(((csfloatSkin.Price*0.975)-skinportPrice)*100) / 100
 
-			if (ProfitAfterWithdrawFrom <= 0 || ProfitAfterWithdrawTo <= 0) || (csfloatPrice/skinportPrice) > 15 {
+			if (ProfitAfterWithdrawFrom <= 1 || ProfitAfterWithdrawTo <= 1) || (csfloatPrice/skinportPrice) > 15 {
 				continue
 			}
 
@@ -114,7 +121,7 @@ func Run(csfloatDataList []markets.SkinItem, skinportDataList []markets.SkinItem
 			ProfitAfterWithdrawFrom := math.Round(((csfloatSkin.Price*0.955)-c5gamePrice)*100) / 100
 			ProfitAfterWithdrawTo := math.Round(((csfloatSkin.Price*0.975)-c5gamePrice)*100) / 100
 
-			if (ProfitAfterWithdrawFrom <= 0 || ProfitAfterWithdrawTo <= 0) || (csfloatPrice/c5gamePrice) > 15 {
+			if (ProfitAfterWithdrawFrom <= 1 || ProfitAfterWithdrawTo <= 1) || (csfloatPrice/c5gamePrice) > 15 {
 				continue
 			}
 
@@ -209,6 +216,54 @@ func buildSkinMap(data []markets.SkinItem) map[string]markets.SkinItem {
 		apiMap[skin.Name] = skin
 	}
 	return apiMap
+}
+
+func filterOutBullshit(skin string) bool {
+	notWeaponGlovesOrKnife := []string{
+		"Agent", "Case", "Capsule", "Pack", "Box", "Package",
+		"Sticker |", "Charm |", "Patch |", "Collectible", "Music Kit |",
+	}
+
+	for _, nw := range notWeaponGlovesOrKnife {
+		if strings.Contains(skin, nw) {
+			return true
+		}
+	}
+
+	wears := []string{"Well-Worn", "Battle-Scarred"}
+
+	if strings.Contains(skin, "★") {
+		// Knife or Glove
+		if strings.Contains(skin, "★ StatTrak™") {
+			return true
+		}
+
+		if strings.Contains(skin, "Gloves") || strings.Contains(skin, "Wraps") {
+			// Gloves
+			for _, w := range wears {
+				if strings.Contains(skin, w) {
+					return true
+				}
+			}
+			return false
+		} else {
+			// Knife
+			for _, w := range wears {
+				if strings.Contains(skin, w) {
+					return true
+				}
+			}
+			return false
+		}
+	} else {
+		// Weapon
+		for _, w := range wears {
+			if strings.Contains(skin, w) {
+				return true
+			}
+		}
+		return false
+	}
 }
 
 func saveTradesToMongo(data *CalculatorOutput) error {
