@@ -43,6 +43,7 @@ func Run(csfloatDataList []markets.SkinItem, skinportDataList []markets.SkinItem
 		Trades: []TradeItem{},
 	}
 
+	var name string
 	var trades []TradeItem
 	var skins []markets.SkinListItem
 
@@ -58,8 +59,14 @@ func Run(csfloatDataList []markets.SkinItem, skinportDataList []markets.SkinItem
 
 		csfloatPrice := math.Round((csfloatSkin.Price*0.98)*100) / 100
 
-		skinportSkin := skinportMap[csfloatSkin.Name]
-		c5gameSkin := c5gameMap[csfloatSkin.Name]
+		if csfloatSkin.Style == "" {
+			name = csfloatSkin.Name
+		} else {
+			name = fmt.Sprintf("%s %s", csfloatSkin.Name, csfloatSkin.Style)
+		}
+
+		skinportSkin := skinportMap[name]
+		c5gameSkin := c5gameMap[name]
 
 		if skinportSkin.Price == 0 && c5gameSkin.Price == 0 {
 			continue
@@ -212,8 +219,15 @@ func Run(csfloatDataList []markets.SkinItem, skinportDataList []markets.SkinItem
 
 func buildSkinMap(data []markets.SkinItem) map[string]markets.SkinItem {
 	apiMap := make(map[string]markets.SkinItem)
+	var name string
+
 	for _, skin := range data {
-		apiMap[skin.Name] = skin
+		if skin.Style == "" {
+			name = skin.Name
+		} else {
+			name = fmt.Sprintf("%s %s", skin.Name, skin.Style)
+		}
+		apiMap[name] = skin
 	}
 	return apiMap
 }
