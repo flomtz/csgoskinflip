@@ -9,6 +9,6 @@ import (
 
 func SetupRoutes() {
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /status", handlers.GetStatus)
+	mux.HandleFunc("GET /api/status", handlers.GetStatus)
 	http.ListenAndServe(config.Config.BindAddress, mux)
 }
