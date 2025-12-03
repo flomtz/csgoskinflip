@@ -15,20 +15,13 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 )
 
-type C5GameItem struct {
-	Name  string  `json:"name"`
-	Style string  `json:"style"`
-	Link  string  `json:"link"`
-	Price float64 `json:"price"`
-}
-
 type C5GameOutout struct {
-	C5Game []C5GameItem `json:"c5game"`
+	C5Game []SkinItem `json:"c5game"`
 }
 
-func C5Game(skinlist []SkinListItem, rmbExchange float64) error {
+func C5Game(skinlist []SkinListItem, rmbExchange float64) (*C5GameOutout, error) {
 	result := &C5GameOutout{
-		C5Game: []C5GameItem{},
+		C5Game: []SkinItem{},
 	}
 
 	var normalSkins []SkinListItem
@@ -50,26 +43,26 @@ func C5Game(skinlist []SkinListItem, rmbExchange float64) error {
 
 	normalSkinsList, err := fetchNormalSkins(normalSkins, rmbExchange)
 	if err != nil {
-		return fmt.Errorf("failed to get normal skins prices: %v", err)
+		return nil, fmt.Errorf("failed to get normal skins prices: %v", err)
 	}
 
 	dopplerSkinsList, err := fetchDopplerSkins(dopplerSkins, rmbExchange)
 	if err != nil {
-		return fmt.Errorf("failed to get doppler skins prices: %v", err)
+		return nil, fmt.Errorf("failed to get doppler skins prices: %v", err)
 	}
 
 	result.C5Game = append(normalSkinsList, dopplerSkinsList...)
 
 	err = saveC5GameToMongo(result)
 	if err != nil {
-		return fmt.Errorf("failed to save c5game data: %v", err)
+		return nil, fmt.Errorf("failed to save c5game data: %v", err)
 	}
 
-	return nil
+	return result, nil
 }
 
-func fetchNormalSkins(skinlist []SkinListItem, rmbExchange float64) ([]C5GameItem, error) {
-	var result []C5GameItem
+func fetchNormalSkins(skinlist []SkinListItem, rmbExchange float64) ([]SkinItem, error) {
+	var result []SkinItem
 	apiBulkUrl := fmt.Sprintf("https://openapi.c5game.com/merchant/product/price/batch?app-key=%s", config.Config.C5GameAPIKey)
 
 	bulkList := make([]string, 0, len(skinlist))
@@ -138,14 +131,14 @@ func fetchNormalSkins(skinlist []SkinListItem, rmbExchange float64) ([]C5GameIte
 			mu.Lock()
 			for _, requestedName := range job.items {
 				if item, exists := apiResp.Data[requestedName]; exists {
-					result = append(result, C5GameItem{
+					result = append(result, SkinItem{
 						Name:  item.MarketHashName,
 						Style: "",
 						Link:  item.Website,
 						Price: math.Round((item.Price*rmbExchange)*100) / 100,
 					})
 				} else {
-					result = append(result, C5GameItem{
+					result = append(result, SkinItem{
 						Name:  requestedName,
 						Style: "",
 						Link:  "",
@@ -199,8 +192,8 @@ var styleMap = map[string]int{
 	"Singleblue":  35,
 }
 
-func fetchDopplerSkins(skinlist []SkinListItem, rmbExchange float64) ([]C5GameItem, error) {
-	var result []C5GameItem
+func fetchDopplerSkins(skinlist []SkinListItem, rmbExchange float64) ([]SkinItem, error) {
+	var result []SkinItem
 	apiUrl := fmt.Sprintf("https://openapi.c5game.com/merchant/market/v2/products/condition/hash/name?app-key=%s", config.Config.C5GameAPIKey)
 
 	type apiResponse struct {
@@ -251,7 +244,7 @@ func fetchDopplerSkins(skinlist []SkinListItem, rmbExchange float64) ([]C5GameIt
 		}
 
 		if len(apiResp.Data.List) == 0 {
-			entry := C5GameItem{
+			entry := SkinItem{
 				Name:  skin.Name,
 				Style: skin.Style,
 				Link:  "",
@@ -270,7 +263,7 @@ func fetchDopplerSkins(skinlist []SkinListItem, rmbExchange float64) ([]C5GameIt
 			styleId,
 		)
 
-		entry := C5GameItem{
+		entry := SkinItem{
 			Name:  bestListing.MarketHashName,
 			Style: skin.Style,
 			Link:  link,

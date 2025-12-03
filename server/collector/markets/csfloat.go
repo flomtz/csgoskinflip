@@ -31,19 +31,20 @@ type DopplerResponse struct {
 	Data []DopplerPriceItem `json:"data"`
 }
 
-type CSFloatItem struct {
+type SkinItem struct {
 	Name  string  `json:"name"`
 	Style string  `json:"style"`
+	Link  string  `json:"link"`
 	Price float64 `json:"price"`
 }
 
 type CSFloatOutput struct {
-	CSFloat []CSFloatItem `json:"csfloat"`
+	CSFloat []SkinItem `json:"csfloat"`
 }
 
 func CSFloat(usdExchange float64) (*CSFloatOutput, error) {
 	result := &CSFloatOutput{
-		CSFloat: []CSFloatItem{},
+		CSFloat: []SkinItem{},
 	}
 
 	normalItems, err := fetchNormalPriceList()
@@ -57,7 +58,7 @@ func CSFloat(usdExchange float64) (*CSFloatOutput, error) {
 	}
 
 	for _, item := range normalItems {
-		result.CSFloat = append(result.CSFloat, CSFloatItem{
+		result.CSFloat = append(result.CSFloat, SkinItem{
 			Name:  item.MarketHashName,
 			Style: "",
 			Price: math.Round(((item.MinPrice/100)*usdExchange)*100) / 100,
@@ -65,7 +66,7 @@ func CSFloat(usdExchange float64) (*CSFloatOutput, error) {
 	}
 
 	for _, item := range dopplerItems {
-		result.CSFloat = append(result.CSFloat, CSFloatItem{
+		result.CSFloat = append(result.CSFloat, SkinItem{
 			Name:  item.MarketHashName,
 			Style: item.PhaseName,
 			Price: math.Round(((item.MinPrice/100)*usdExchange)*100) / 100,
