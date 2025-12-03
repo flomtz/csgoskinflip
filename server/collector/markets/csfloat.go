@@ -18,6 +18,7 @@ const (
 
 type NormalPriceItem struct {
 	MarketHashName string  `json:"market_hash_name"`
+	Quantity       int     `json:"qty"`
 	MinPrice       float64 `json:"min_price"`
 }
 
@@ -25,6 +26,7 @@ type DopplerPriceItem struct {
 	MarketHashName string  `json:"market_hash_name"`
 	MinPrice       float64 `json:"min_price"`
 	PhaseName      string  `json:"phase_name"`
+	Quantity       int     `json:"qty"`
 }
 
 type DopplerResponse struct {
@@ -32,10 +34,11 @@ type DopplerResponse struct {
 }
 
 type SkinItem struct {
-	Name  string  `json:"name"`
-	Style string  `json:"style"`
-	Link  string  `json:"link"`
-	Price float64 `json:"price"`
+	Name     string  `json:"name"`
+	Style    string  `json:"style"`
+	Link     string  `json:"link"`
+	Price    float64 `json:"price"`
+	Quantity int     `json:"qty"`
 }
 
 type CSFloatOutput struct {
@@ -59,17 +62,19 @@ func CSFloat(usdExchange float64) (*CSFloatOutput, error) {
 
 	for _, item := range normalItems {
 		result.CSFloat = append(result.CSFloat, SkinItem{
-			Name:  item.MarketHashName,
-			Style: "",
-			Price: math.Round(((item.MinPrice/100)*usdExchange)*100) / 100,
+			Name:     item.MarketHashName,
+			Style:    "",
+			Quantity: item.Quantity,
+			Price:    math.Round(((item.MinPrice/100)*usdExchange)*100) / 100,
 		})
 	}
 
 	for _, item := range dopplerItems {
 		result.CSFloat = append(result.CSFloat, SkinItem{
-			Name:  item.MarketHashName,
-			Style: item.PhaseName,
-			Price: math.Round(((item.MinPrice/100)*usdExchange)*100) / 100,
+			Name:     item.MarketHashName,
+			Style:    item.PhaseName,
+			Quantity: item.Quantity,
+			Price:    math.Round(((item.MinPrice/100)*usdExchange)*100) / 100,
 		})
 	}
 

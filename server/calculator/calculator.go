@@ -52,7 +52,7 @@ func Run(csfloatDataList []markets.SkinItem, skinportDataList []markets.SkinItem
 
 	for _, csfloatSkin := range csfloatDataList {
 
-		out := filterOutBullshit(csfloatSkin.Name)
+		out := filterOutBullshit(csfloatSkin.Name, csfloatSkin.Quantity, csfloatSkin.Price)
 		if out {
 			continue
 		}
@@ -232,7 +232,7 @@ func buildSkinMap(data []markets.SkinItem) map[string]markets.SkinItem {
 	return apiMap
 }
 
-func filterOutBullshit(skin string) bool {
+func filterOutBullshit(skin string, qty int, price float64) bool {
 	notWeaponGlovesOrKnife := []string{
 		"Agent", "Case", "Capsule", "Pack", "Box", "Package",
 		"Sticker |", "Charm |", "Patch |", "Collectible", "Music Kit |",
@@ -250,6 +250,12 @@ func filterOutBullshit(skin string) bool {
 		// Knife or Glove
 		if strings.Contains(skin, "★ StatTrak™") {
 			return true
+		}
+
+		if price < 200.0 {
+			if qty < 12 {
+				return true
+			}
 		}
 
 		if strings.Contains(skin, "Gloves") || strings.Contains(skin, "Wraps") {
@@ -271,11 +277,16 @@ func filterOutBullshit(skin string) bool {
 		}
 	} else {
 		// Weapon
+		if qty < 12 {
+			return true
+		}
+
 		for _, w := range wears {
 			if strings.Contains(skin, w) {
 				return true
 			}
 		}
+
 		return false
 	}
 }
