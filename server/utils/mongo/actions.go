@@ -91,6 +91,24 @@ func CheckForExisting(database, collectionName string, checkFor bson.M) (bool, e
 	return true, nil
 }
 
+func CollectionExists(database, collectionName string) (bool, error) {
+	collectionNames, err := mongoCli.Database(database).ListCollectionNames(
+		context.Background(),
+		bson.M{},
+	)
+	if err != nil {
+		return false, fmt.Errorf("failed to list collections: %v", err)
+	}
+
+	for _, name := range collectionNames {
+		if name == collectionName {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
 func DeleteOne(database, collectionName string, filter bson.M) error {
 	collection := mongoCli.Database(database).Collection(collectionName)
 

@@ -1,6 +1,7 @@
 package calculator
 
 import (
+	"csgoskinflip/server/cache"
 	"csgoskinflip/server/collector/markets"
 	"csgoskinflip/server/utils/mongo"
 	"fmt"
@@ -40,6 +41,9 @@ func Run(csfloatDataList []markets.SkinItem, skinportDataList []markets.SkinItem
 	result := &CalculatorOutput{
 		Trades: []TradeItem{},
 	}
+
+	var trades []TradeItem
+	var skins []markets.SkinListItem
 
 	skinportMap := buildSkinMap(skinportDataList)
 	c5gameMap := buildSkinMap(c5gameDataList)
@@ -84,7 +88,12 @@ func Run(csfloatDataList []markets.SkinItem, skinportDataList []markets.SkinItem
 				continue
 			}
 
-			result.Trades = append(result.Trades, TradeItem{
+			skins = append(skins, markets.SkinListItem{
+				Name:  csfloatSkin.Name,
+				Style: csfloatSkin.Style,
+			})
+
+			trades = append(trades, TradeItem{
 				Name:                    csfloatSkin.Name,
 				Style:                   csfloatSkin.Style,
 				BuyPlattform:            "skinport",
@@ -115,7 +124,12 @@ func Run(csfloatDataList []markets.SkinItem, skinportDataList []markets.SkinItem
 				continue
 			}
 
-			result.Trades = append(result.Trades, TradeItem{
+			skins = append(skins, markets.SkinListItem{
+				Name:  csfloatSkin.Name,
+				Style: csfloatSkin.Style,
+			})
+
+			trades = append(trades, TradeItem{
 				Name:                    csfloatSkin.Name,
 				Style:                   csfloatSkin.Style,
 				BuyPlattform:            "c5game",
@@ -135,7 +149,55 @@ func Run(csfloatDataList []markets.SkinItem, skinportDataList []markets.SkinItem
 		}
 	}
 
-	err := saveTradesToMongo(result)
+	skincache, err := cache.SkinCache(skins)
+	if err != nil {
+		fmt.Printf("failed to get skincache: %v", err)
+	}
+
+	type floatStruct struct {
+		from float64
+		to   float64
+	}
+
+	floatMap := map[string]floatStruct{
+		"Factory New":    {from: 0, to: 0.07},
+		"Minimal Wear":   {from: 0.07, to: 0.15},
+		"Field-Tested":   {from: 0.15, to: 0.38},
+		"Well-Worn":      {from: 0.38, to: 0.45},
+		"Battle-Scarred": {from: 0.45, to: 1},
+	}
+
+	var cacheName string
+
+	for index := range trades {
+		trade := &trades[index]
+
+		if trade.Style == "" {
+			cacheName = trade.Name
+		} else {
+			cacheName = fmt.Sprintf("%s %s", trade.Name, trade.Style)
+		}
+
+		skincacheItem, ok := skincache[cacheName]
+		if !ok {
+			continue
+		}
+
+		float, ok := floatMap[skincacheItem.WearName]
+		if !ok {
+			float = floatStruct{from: 0.0, to: 1.0}
+		}
+
+		trade.SellLink = fmt.Sprintf(
+			"https://csfloat.com/search?sort_by=lowest_price&min_float=%f&max_float=%f&def_index=%v&paint_index=%v",
+			float.from, float.to, skincacheItem.DefIndex, skincacheItem.PaintIndex,
+		)
+		trade.Image = fmt.Sprintf("https://community.akamai.steamstatic.com/economy/image/%s", skincacheItem.ImageURL)
+	}
+
+	result.Trades = trades
+
+	err = saveTradesToMongo(result)
 	if err != nil {
 		fmt.Printf("failed to save trades data to mongodb: %v\n", err)
 	}
